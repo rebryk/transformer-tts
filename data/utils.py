@@ -1,7 +1,7 @@
 import collections
 
 import numpy as np
-import torch as t
+import torch
 
 
 def collate_fn_transformer(batch):
@@ -27,8 +27,8 @@ def collate_fn_transformer(batch):
         pos_mel = _prepare_data(pos_mel).astype(np.int32)
         pos_text = _prepare_data(pos_text).astype(np.int32)
 
-        return t.LongTensor(text), t.FloatTensor(mel), t.FloatTensor(mel_input), \
-               t.LongTensor(pos_text), t.LongTensor(pos_mel), t.LongTensor(text_length)
+        return torch.LongTensor(text), torch.FloatTensor(mel), torch.FloatTensor(mel_input), \
+               torch.LongTensor(pos_text), torch.LongTensor(pos_mel), torch.LongTensor(text_length)
 
     raise TypeError(f'Batch must contain tensors, numbers, dicts or lists; found {type(batch[0])}')
 
@@ -43,7 +43,7 @@ def collate_fn_postnet(batch):
         mel = _pad_mel(mel)
         mag = _pad_mel(mag)
 
-        return t.FloatTensor(mel), t.FloatTensor(mag)
+        return torch.FloatTensor(mel), torch.FloatTensor(mag)
 
     raise TypeError(f'Batch must contain tensors, numbers, dicts or lists; found {type(batch[0])}')
 

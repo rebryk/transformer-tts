@@ -9,8 +9,8 @@ from tqdm import tqdm
 
 import config
 from data import LJDataset
+from data import collate_fn_transformer
 from network import Model
-from preprocess import collate_fn_transformer
 from utils import adjust_learning_rate
 
 if __name__ == '__main__':

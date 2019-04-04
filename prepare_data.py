@@ -1,10 +1,14 @@
+import os
+
+import librosa
 import numpy as np
 import pandas as pd
 from torch.utils.data import Dataset, DataLoader
-import os
-from utils import get_spectrograms
+from tqdm import tqdm
+
 import hyperparams as hp
-import librosa
+from utils import get_spectrograms
+
 
 class PrepareDataset(Dataset):
     """LJSpeech dataset."""
@@ -32,14 +36,17 @@ class PrepareDataset(Dataset):
         np.save(wav_name[:-4] + '.pt', mel)
         np.save(wav_name[:-4] + '.mag', mag)
 
-        sample = {'mel':mel, 'mag': mag}
+        sample = {
+            'mel': mel,
+            'mag': mag
+        }
 
         return sample
-    
+
+
 if __name__ == '__main__':
-    dataset = PrepareDataset(os.path.join(hp.data_path,'metadata.csv'), os.path.join(hp.data_path,'wavs'))
-    dataloader = DataLoader(dataset, batch_size=1, drop_last=False, num_workers=8)
-    from tqdm import tqdm
-    pbar = tqdm(dataloader)
-    for d in pbar:
+    dataset = PrepareDataset(os.path.join(hp.data_path, 'metadata.csv'), os.path.join(hp.data_path, 'wavs'))
+    dataloader = DataLoader(dataset, batch_size=1, drop_last=False, num_workers=10)
+
+    for _ in tqdm(dataloader):
         pass

@@ -5,7 +5,7 @@ import librosa
 import numpy as np
 import pandas as pd
 import torch as t
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 
 import hyperparams as hp
 from text import text_to_sequence

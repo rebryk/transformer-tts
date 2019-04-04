@@ -23,12 +23,12 @@ if __name__ == '__main__':
         ref_db=config.ref_db
     )
 
-    m = nn.DataParallel(ModelPostNet().cuda(), device_ids=config.device_ids)
+    model = nn.DataParallel(ModelPostNet().cuda(), device_ids=config.device_ids)
 
-    m.train()
-    optimizer = torch.optim.Adam(m.parameters(), lr=config.lr)
+    model.train()
+    optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
 
-    writer = SummaryWriter()
+    writer = SummaryWriter(log_dir='logs/postnet')
     global_step = 0
 
     for epoch in range(config.epochs):
@@ -54,7 +54,7 @@ if __name__ == '__main__':
             mel = mel.cuda()
             mag = mag.cuda()
 
-            mag_pred = m.forward(mel)
+            mag_pred = model.forward(mel)
 
             loss = nn.L1Loss()(mag_pred, mag)
 
@@ -70,7 +70,7 @@ if __name__ == '__main__':
             loss.backward()
 
             # Gradient clipping
-            nn.utils.clip_grad_norm_(m.parameters(), 1.)
+            nn.utils.clip_grad_norm_(model.parameters(), 1.)
 
             # Update weights
             optimizer.step()
@@ -78,7 +78,7 @@ if __name__ == '__main__':
             if global_step % config.save_step == 0:
                 torch.save(
                     {
-                        'model': m.state_dict(),
+                        'model': model.state_dict(),
                         'optimizer': optimizer.state_dict()
                     },
                     os.path.join(config.checkpoint_path, f'checkpoint_postnet_{global_step}.pth.tar')

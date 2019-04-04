@@ -33,7 +33,7 @@ if __name__ == '__main__':
     model.train()
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
 
-    writer = SummaryWriter(log_dir='logs')
+    writer = SummaryWriter(log_dir='logs/transformer')
     global_step = 0
 
     for epoch in range(config.epochs):

@@ -1,17 +1,19 @@
 from module import *
 from utils import get_positional_table, get_sinusoid_encoding_table
 import hyperparams as hp
-import copy
+
 
 class Encoder(nn.Module):
     """
-    Encoder Network
+    Encoder Network.
     """
+
     def __init__(self, embedding_size, num_hidden):
         """
         :param embedding_size: dimension of embedding
         :param num_hidden: dimension of hidden
         """
+
         super(Encoder, self).__init__()
         self.alpha = nn.Parameter(t.ones(1))
         self.pos_emb = nn.Embedding.from_pretrained(get_sinusoid_encoding_table(1024, num_hidden, padding_idx=0),
@@ -22,12 +24,10 @@ class Encoder(nn.Module):
         self.ffns = clones(FFN(num_hidden), 3)
 
     def forward(self, x, pos):
-
         # Get character mask
         if self.training:
             c_mask = pos.ne(0).type(t.float)
             mask = pos.eq(0).unsqueeze(1).repeat(1, x.size(1), 1)
-
         else:
             c_mask, mask = None, None
 
@@ -53,12 +53,14 @@ class Encoder(nn.Module):
 
 class MelDecoder(nn.Module):
     """
-    Decoder Network
+    Decoder Network.
     """
+
     def __init__(self, num_hidden):
         """
         :param num_hidden: dimension of hidden
         """
+
         super(MelDecoder, self).__init__()
         self.pos_emb = nn.Embedding.from_pretrained(get_sinusoid_encoding_table(1024, num_hidden, padding_idx=0),
                                                     freeze=True)
@@ -79,7 +81,7 @@ class MelDecoder(nn.Module):
         batch_size = memory.size(0)
         decoder_len = decoder_input.size(1)
 
-        # get decoder mask with triangular matrix
+        # Get decoder mask with triangular matrix
         if self.training:
             m_mask = pos.ne(0).type(t.float)
             mask = m_mask.eq(0).unsqueeze(1).repeat(1, decoder_len, 1)
@@ -152,6 +154,7 @@ class ModelPostNet(nn.Module):
     """
     CBHG Network (mel --> linear)
     """
+
     def __init__(self):
         super(ModelPostNet, self).__init__()
         self.pre_projection = Conv(hp.n_mels, hp.hidden_size)

@@ -1,20 +1,24 @@
-import torch.nn as nn
-import torch as t
-import torch.nn.functional as F
+import copy
 import math
+from collections import OrderedDict
+
+import numpy as np
+import torch as t
+import torch.nn as nn
+
 import hyperparams as hp
 from text.symbols import symbols
-import numpy as np
-import copy
-from collections import OrderedDict
+
 
 def clones(module, N):
     return nn.ModuleList([copy.deepcopy(module) for _ in range(N)])
 
+
 class Linear(nn.Module):
     """
-    Linear Module
+    Linear Module.
     """
+
     def __init__(self, in_dim, out_dim, bias=True, w_init='linear'):
         """
         :param in_dim: dimension of input
@@ -22,12 +26,14 @@ class Linear(nn.Module):
         :param bias: boolean. if True, bias is included.
         :param w_init: str. weight inits with xavier initialization.
         """
+
         super(Linear, self).__init__()
         self.linear_layer = nn.Linear(in_dim, out_dim, bias=bias)
 
         nn.init.xavier_uniform_(
             self.linear_layer.weight,
-            gain=nn.init.calculate_gain(w_init))
+            gain=nn.init.calculate_gain(w_init)
+        )
 
     def forward(self, x):
         return self.linear_layer(x)
@@ -35,10 +41,18 @@ class Linear(nn.Module):
 
 class Conv(nn.Module):
     """
-    Convolution Module
+    Convolution Module.
     """
-    def __init__(self, in_channels, out_channels, kernel_size=1, stride=1,
-                 padding=0, dilation=1, bias=True, w_init='linear'):
+
+    def __init__(self,
+                 in_channels,
+                 out_channels,
+                 kernel_size=1,
+                 stride=1,
+                 padding=0,
+                 dilation=1,
+                 bias=True,
+                 w_init='linear'):
         """
         :param in_channels: dimension of input
         :param out_channels: dimension of output
@@ -49,46 +63,56 @@ class Conv(nn.Module):
         :param bias: boolean. if True, bias is included.
         :param w_init: str. weight inits with xavier initialization.
         """
+
         super(Conv, self).__init__()
 
-        self.conv = nn.Conv1d(in_channels, out_channels,
-                              kernel_size=kernel_size, stride=stride,
-                              padding=padding, dilation=dilation,
-                              bias=bias)
+        self.conv = nn.Conv1d(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding=padding,
+            dilation=dilation,
+            bias=bias
+        )
 
-        nn.init.xavier_uniform_(
-            self.conv.weight, gain=nn.init.calculate_gain(w_init))
+        nn.init.xavier_uniform_(self.conv.weight, gain=nn.init.calculate_gain(w_init))
 
     def forward(self, x):
-        x = self.conv(x)
-        return x
+        return self.conv(x)
 
 
 class EncoderPrenet(nn.Module):
     """
     Pre-network for Encoder consists of convolution networks.
     """
+
     def __init__(self, embedding_size, num_hidden):
         super(EncoderPrenet, self).__init__()
         self.embedding_size = embedding_size
         self.embed = nn.Embedding(len(symbols), embedding_size, padding_idx=0)
 
-        self.conv1 = Conv(in_channels=embedding_size,
-                          out_channels=num_hidden,
-                          kernel_size=5,
-                          padding=int(np.floor(5 / 2)),
-                          w_init='relu')
-        self.conv2 = Conv(in_channels=num_hidden,
-                          out_channels=num_hidden,
-                          kernel_size=5,
-                          padding=int(np.floor(5 / 2)),
-                          w_init='relu')
-
-        self.conv3 = Conv(in_channels=num_hidden,
-                          out_channels=num_hidden,
-                          kernel_size=5,
-                          padding=int(np.floor(5 / 2)),
-                          w_init='relu')
+        self.conv1 = Conv(
+            in_channels=embedding_size,
+            out_channels=num_hidden,
+            kernel_size=5,
+            padding=int(np.floor(5 / 2)),
+            w_init='relu'
+        )
+        self.conv2 = Conv(
+            in_channels=num_hidden,
+            out_channels=num_hidden,
+            kernel_size=5,
+            padding=int(np.floor(5 / 2)),
+            w_init='relu'
+        )
+        self.conv3 = Conv(
+            in_channels=num_hidden,
+            out_channels=num_hidden,
+            kernel_size=5,
+            padding=int(np.floor(5 / 2)),
+            w_init='relu'
+        )
 
         self.batch_norm1 = nn.BatchNorm1d(num_hidden)
         self.batch_norm2 = nn.BatchNorm1d(num_hidden)
@@ -99,47 +123,45 @@ class EncoderPrenet(nn.Module):
         self.dropout3 = nn.Dropout(p=0.2)
         self.projection = Linear(num_hidden, num_hidden)
 
-    def forward(self, input_):
-        input_ = self.embed(input_) 
-        input_ = input_.transpose(1, 2) 
-        input_ = self.dropout1(self.batch_norm1(t.relu(self.conv1(input_)))) 
-        input_ = self.dropout2(self.batch_norm2(t.relu(self.conv2(input_)))) 
-        input_ = self.dropout3(self.batch_norm3(t.relu(self.conv3(input_)))) 
-        input_ = input_.transpose(1, 2) 
-        input_ = self.projection(input_) 
+    def forward(self, x):
+        x = self.embed(x)
+        x = x.transpose(1, 2)
+        x = self.dropout1(self.batch_norm1(t.relu(self.conv1(x))))
+        x = self.dropout2(self.batch_norm2(t.relu(self.conv2(x))))
+        x = self.dropout3(self.batch_norm3(t.relu(self.conv3(x))))
+        x = x.transpose(1, 2)
+        x = self.projection(x)
 
-        return input_
+        return x
 
 
 class FFN(nn.Module):
     """
-    Positionwise Feed-Forward Network
+    Position-wise Feed-Forward Network.
     """
     
     def __init__(self, num_hidden):
         """
         :param num_hidden: dimension of hidden 
         """
+
         super(FFN, self).__init__()
         self.w_1 = Conv(num_hidden, num_hidden * 4, kernel_size=1, w_init='relu')
         self.w_2 = Conv(num_hidden * 4, num_hidden, kernel_size=1)
         self.dropout = nn.Dropout(p=0.1)
         self.layer_norm = nn.LayerNorm(num_hidden)
 
-    def forward(self, input_):
+    def forward(self, x):
         # FFN Network
-        x = input_.transpose(1, 2) 
-        x = self.w_2(t.relu(self.w_1(x))) 
-        x = x.transpose(1, 2) 
+        x_ = x.transpose(1, 2)
+        x_ = self.w_2(t.relu(self.w_1(x_)))
+        x_ = x_.transpose(1, 2)
 
-        # residual connection
-        x = x + input_ 
+        # Residual connection
+        x = x_ + x
 
-        # dropout
-        x = self.dropout(x) 
-
-        # layer normalization
-        x = self.layer_norm(x) 
+        x = self.dropout(x)
+        x = self.layer_norm(x)
 
         return x
 
@@ -148,26 +170,32 @@ class PostConvNet(nn.Module):
     """
     Post Convolutional Network (mel --> mel)
     """
+
     def __init__(self, num_hidden):
         """
-        
         :param num_hidden: dimension of hidden 
         """
+
         super(PostConvNet, self).__init__()
-        self.conv1 = Conv(in_channels=hp.num_mels * hp.outputs_per_step,
-                          out_channels=num_hidden,
-                          kernel_size=5,
-                          padding=4,
-                          w_init='tanh')
+        self.conv1 = Conv(
+            in_channels=hp.num_mels * hp.outputs_per_step,
+            out_channels=num_hidden,
+            kernel_size=5,
+            padding=4,
+            w_init='tanh'
+        )
         self.conv_list = clones(Conv(in_channels=num_hidden,
                                      out_channels=num_hidden,
                                      kernel_size=5,
                                      padding=4,
                                      w_init='tanh'), 3)
-        self.conv2 = Conv(in_channels=num_hidden,
-                          out_channels=hp.num_mels * hp.outputs_per_step,
-                          kernel_size=5,
-                          padding=4)
+
+        self.conv2 = Conv(
+            in_channels=num_hidden,
+            out_channels=hp.num_mels * hp.outputs_per_step,
+            kernel_size=5,
+            padding=4
+        )
 
         self.batch_norm_list = clones(nn.BatchNorm1d(num_hidden), 3)
         self.pre_batchnorm = nn.BatchNorm1d(num_hidden)
@@ -175,23 +203,25 @@ class PostConvNet(nn.Module):
         self.dropout1 = nn.Dropout(p=0.1)
         self.dropout_list = nn.ModuleList([nn.Dropout(p=0.1) for _ in range(3)])
 
-    def forward(self, input_, mask=None):
+    def forward(self, x, mask=None):
         # Causal Convolution (for auto-regressive)
-        input_ = self.dropout1(t.tanh(self.pre_batchnorm(self.conv1(input_)[:, :, :-4])))
+        x = self.dropout1(t.tanh(self.pre_batchnorm(self.conv1(x)[:, :, :-4])))
         for batch_norm, conv, dropout in zip(self.batch_norm_list, self.conv_list, self.dropout_list):
-            input_ = dropout(t.tanh(batch_norm(conv(input_)[:, :, :-4])))
-        input_ = self.conv2(input_)[:, :, :-4]
-        return input_
+            x = dropout(t.tanh(batch_norm(conv(x)[:, :, :-4])))
+        x = self.conv2(x)[:, :, :-4]
+        return x
 
 
 class MultiheadAttention(nn.Module):
     """
-    Multihead attention mechanism (dot attention)
+    Multihead attention mechanism (dot attention).
     """
+
     def __init__(self, num_hidden_k):
         """
         :param num_hidden_k: dimension of hidden 
         """
+
         super(MultiheadAttention, self).__init__()
 
         self.num_hidden_k = num_hidden_k
@@ -224,13 +254,15 @@ class MultiheadAttention(nn.Module):
 
 class Attention(nn.Module):
     """
-    Attention Network
+    Attention Network.
     """
+
     def __init__(self, num_hidden, h=4):
         """
         :param num_hidden: dimension of hidden
         :param h: num of heads 
         """
+
         super(Attention, self).__init__()
 
         self.num_hidden = num_hidden
@@ -250,7 +282,6 @@ class Attention(nn.Module):
         self.layer_norm_1 = nn.LayerNorm(num_hidden)
 
     def forward(self, memory, decoder_input, mask=None, query_mask=None):
-
         batch_size = memory.size(0)
         seq_k = memory.size(1)
         seq_q = decoder_input.size(1)
@@ -296,8 +327,9 @@ class Attention(nn.Module):
 
 class Prenet(nn.Module):
     """
-    Prenet before passing through the network
+    Prenet before passing through the network.
     """
+
     def __init__(self, input_size, hidden_size, output_size, p=0.5):
         """
         :param input_size: dimension of input
@@ -317,17 +349,22 @@ class Prenet(nn.Module):
              ('dropout2', nn.Dropout(p)),
         ]))
 
-    def forward(self, input_):
+    def forward(self, x):
+        return self.layer(x)
 
-        out = self.layer(input_)
 
-        return out
-    
 class CBHG(nn.Module):
     """
-    CBHG Module
+    CBHG Module.
     """
-    def __init__(self, hidden_size, K=16, projection_size = 256, num_gru_layers=2, max_pool_kernel_size=2, is_post=False):
+
+    def __init__(self,
+                 hidden_size,
+                 K=16,
+                 projection_size=256,
+                 num_gru_layers=2,
+                 max_pool_kernel_size=2,
+                 is_post=False):
         """
         :param hidden_size: dimension of hidden unit
         :param K: # of convolution banks
@@ -336,61 +373,73 @@ class CBHG(nn.Module):
         :param max_pool_kernel_size: max pooling kernel size
         :param is_post: whether post processing or not
         """
+
         super(CBHG, self).__init__()
         self.hidden_size = hidden_size
         self.projection_size = projection_size
         self.convbank_list = nn.ModuleList()
-        self.convbank_list.append(nn.Conv1d(in_channels=projection_size,
-                                                out_channels=hidden_size,
-                                                kernel_size=1,
-                                                padding=int(np.floor(1/2))))
 
-        for i in range(2, K+1):
-            self.convbank_list.append(nn.Conv1d(in_channels=hidden_size,
-                                                out_channels=hidden_size,
-                                                kernel_size=i,
-                                                padding=int(np.floor(i/2))))
+        layer = nn.Conv1d(
+            in_channels=projection_size,
+            out_channels=hidden_size,
+            kernel_size=1,
+            padding=int(np.floor(1 / 2))
+        )
+        self.convbank_list.append(layer)
+
+        for i in range(2, K + 1):
+            layer = nn.Conv1d(
+                in_channels=hidden_size,
+                out_channels=hidden_size,
+                kernel_size=i,
+                padding=int(np.floor(i / 2))
+            )
+            self.convbank_list.append(layer)
 
         self.batchnorm_list = nn.ModuleList()
-        for i in range(1, K+1):
+        for i in range(1, K + 1):
             self.batchnorm_list.append(nn.BatchNorm1d(hidden_size))
 
         convbank_outdim = hidden_size * K
         
-        self.conv_projection_1 = nn.Conv1d(in_channels=convbank_outdim,
-                                             out_channels=hidden_size,
-                                             kernel_size=3,
-                                             padding=int(np.floor(3 / 2)))
-        self.conv_projection_2 = nn.Conv1d(in_channels=hidden_size,
-                                               out_channels=projection_size,
-                                               kernel_size=3,
-                                               padding=int(np.floor(3 / 2)))
+        self.conv_projection_1 = nn.Conv1d(
+            in_channels=convbank_outdim,
+            out_channels=hidden_size,
+            kernel_size=3,
+            padding=int(np.floor(3 / 2))
+        )
+        self.conv_projection_2 = nn.Conv1d(
+            in_channels=hidden_size,
+            out_channels=projection_size,
+            kernel_size=3,
+            padding=int(np.floor(3 / 2))
+        )
         self.batchnorm_proj_1 = nn.BatchNorm1d(hidden_size)
-
         self.batchnorm_proj_2 = nn.BatchNorm1d(projection_size)
-
 
         self.max_pool = nn.MaxPool1d(max_pool_kernel_size, stride=1, padding=1)
         self.highway = Highwaynet(self.projection_size)
-        self.gru = nn.GRU(self.projection_size, self.hidden_size // 2, num_layers=num_gru_layers,
-                          batch_first=True,
-                          bidirectional=True)
-
+        self.gru = nn.GRU(
+            input_size=self.projection_size,
+            hidden_size=self.hidden_size // 2,
+            num_layers=num_gru_layers,
+            batch_first=True,
+            bidirectional=True
+        )
 
     def _conv_fit_dim(self, x, kernel_size=3):
         if kernel_size % 2 == 0:
-            return x[:,:,:-1]
+            return x[:, :, :-1]
         else:
             return x
 
-    def forward(self, input_):
-
-        input_ = input_.contiguous()
-        batch_size = input_.size(0)
-        total_length = input_.size(-1)
+    def forward(self, x):
+        x = x.contiguous()
+        batch_size = x.size(0)
+        total_length = x.size(-1)
 
         convbank_list = list()
-        convbank_input = input_
+        convbank_input = x
 
         # Convolution bank filters
         for k, (conv, batchnorm) in enumerate(zip(self.convbank_list, self.batchnorm_list)):
@@ -405,14 +454,12 @@ class CBHG(nn.Module):
 
         # Projection
         conv_projection = t.relu(self.batchnorm_proj_1(self._conv_fit_dim(self.conv_projection_1(conv_cat))))
-        conv_projection = self.batchnorm_proj_2(self._conv_fit_dim(self.conv_projection_2(conv_projection))) + input_
+        conv_projection = self.batchnorm_proj_2(self._conv_fit_dim(self.conv_projection_2(conv_projection))) + x
 
         # Highway networks
         highway = self.highway.forward(conv_projection.transpose(1,2))
-        
 
         # Bidirectional GRU
-        
         self.gru.flatten_parameters()
         out, _ = self.gru(highway)
 
@@ -421,33 +468,31 @@ class CBHG(nn.Module):
 
 class Highwaynet(nn.Module):
     """
-    Highway network
+    Highway network.
     """
+
     def __init__(self, num_units, num_layers=4):
         """
         :param num_units: dimension of hidden unit
-        :param num_layers: # of highway layers
+        :param num_layers: number of highway layers
         """
+
         super(Highwaynet, self).__init__()
         self.num_units = num_units
         self.num_layers = num_layers
         self.gates = nn.ModuleList()
         self.linears = nn.ModuleList()
+
         for _ in range(self.num_layers):
             self.linears.append(Linear(num_units, num_units))
             self.gates.append(Linear(num_units, num_units))
 
-    def forward(self, input_):
-
-        out = input_
-
-        # highway gated function
+    def forward(self, x):
+        # Highway gated function
         for fc1, fc2 in zip(self.linears, self.gates):
+            h = t.relu(fc1.forward(x))
+            transform = t.sigmoid(fc2.forward(x))
+            carry = 1. - transform
+            x = h * transform + x * carry
 
-            h = t.relu(fc1.forward(out))
-            t_ = t.sigmoid(fc2.forward(out))
-
-            c = 1. - t_
-            out = h * t_ + out * c
-
-        return out
+        return x

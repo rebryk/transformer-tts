@@ -28,3 +28,5 @@ cleaners='english_cleaners'
 data_path = '/data/LJSpeech'
 checkpoint_path = './checkpoint'
 sample_path = './samples'
+
+device_ids = None

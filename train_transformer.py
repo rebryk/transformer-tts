@@ -28,7 +28,7 @@ if __name__ == '__main__':
         ref_db=config.ref_db
     )
 
-    model = nn.DataParallel(Model().cuda(), device_ids=[0, 1])
+    model = nn.DataParallel(Model().cuda(), device_ids=config.device_ids)
 
     model.train()
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)

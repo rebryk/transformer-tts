@@ -23,7 +23,7 @@ if __name__ == '__main__':
         ref_db=config.ref_db
     )
 
-    m = nn.DataParallel(ModelPostNet().cuda())
+    m = nn.DataParallel(ModelPostNet().cuda(), device_ids=config.device_ids)
 
     m.train()
     optimizer = torch.optim.Adam(m.parameters(), lr=config.lr)

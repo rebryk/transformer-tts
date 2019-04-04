@@ -1,51 +1,24 @@
 import os
 
-import librosa
-import numpy as np
-import pandas as pd
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-import hyperparams as hp
-from utils import get_spectrograms
-
-
-class PrepareDataset(Dataset):
-    """LJSpeech dataset."""
-
-    def __init__(self, csv_file, root_dir):
-        """
-        Args:
-            csv_file (string): Path to the csv file with annotations.
-            root_dir (string): Directory with all the wavs.
-
-        """
-        self.landmarks_frame = pd.read_csv(csv_file, sep='|', header=None)
-        self.root_dir = root_dir
-
-    def load_wav(self, filename):
-        return librosa.load(filename, sr=hp.sample_rate)
-
-    def __len__(self):
-        return len(self.landmarks_frame)
-
-    def __getitem__(self, idx):
-        wav_name = os.path.join(self.root_dir, self.landmarks_frame.ix[idx, 0]) + '.wav'
-        mel, mag = get_spectrograms(wav_name)
-        
-        np.save(wav_name[:-4] + '.pt', mel)
-        np.save(wav_name[:-4] + '.mag', mag)
-
-        sample = {
-            'mel': mel,
-            'mag': mag
-        }
-
-        return sample
-
+import config as hp
+from data import PrepareDataset
 
 if __name__ == '__main__':
-    dataset = PrepareDataset(os.path.join(hp.data_path, 'metadata.csv'), os.path.join(hp.data_path, 'wavs'))
+    dataset = PrepareDataset(
+        csv_file=os.path.join(hp.data_path, 'metadata.csv'),
+        root_dir=os.path.join(hp.data_path, 'wavs'),
+        sample_rate=hp.sr,
+        preemphasis=hp.preemphasis,
+        n_fft=hp.n_fft,
+        hop_length=hp.hop_length,
+        win_length=hp.win_length,
+        n_mel=hp.n_mel,
+        max_db=hp.max_db,
+        ref_db=hp.ref_db
+    )
     dataloader = DataLoader(dataset, batch_size=1, drop_last=False, num_workers=10)
 
     for _ in tqdm(dataloader):

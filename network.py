@@ -1,6 +1,5 @@
 from module import *
 from utils import get_positional_table, get_sinusoid_encoding_table
-import hyperparams as hp
 
 
 class Encoder(nn.Module):
@@ -15,7 +14,7 @@ class Encoder(nn.Module):
         """
 
         super(Encoder, self).__init__()
-        self.alpha = nn.Parameter(t.ones(1))
+        self.alpha = nn.Parameter(torch.ones(1))
         self.pos_emb = nn.Embedding.from_pretrained(get_sinusoid_encoding_table(1024, num_hidden, padding_idx=0),
                                                     freeze=True)
         self.pos_dropout = nn.Dropout(p=0.1)
@@ -26,7 +25,7 @@ class Encoder(nn.Module):
     def forward(self, x, pos):
         # Get character mask
         if self.training:
-            c_mask = pos.ne(0).type(t.float)
+            c_mask = pos.ne(0).type(torch.float)
             mask = pos.eq(0).unsqueeze(1).repeat(1, x.size(1), 1)
         else:
             c_mask, mask = None, None
@@ -65,14 +64,14 @@ class MelDecoder(nn.Module):
         self.pos_emb = nn.Embedding.from_pretrained(get_sinusoid_encoding_table(1024, num_hidden, padding_idx=0),
                                                     freeze=True)
         self.pos_dropout = nn.Dropout(p=0.1)
-        self.alpha = nn.Parameter(t.ones(1))
-        self.decoder_prenet = Prenet(hp.num_mels, num_hidden * 2, num_hidden, p=0.2)
+        self.alpha = nn.Parameter(torch.ones(1))
+        self.decoder_prenet = Prenet(config.n_mel, num_hidden * 2, num_hidden, p=0.2)
         self.norm = Linear(num_hidden, num_hidden)
 
         self.selfattn_layers = clones(Attention(num_hidden), 3)
         self.dotattn_layers = clones(Attention(num_hidden), 3)
         self.ffns = clones(FFN(num_hidden), 3)
-        self.mel_linear = Linear(num_hidden, hp.num_mels * hp.outputs_per_step)
+        self.mel_linear = Linear(num_hidden, config.n_mel * config.outputs_per_step)
         self.stop_linear = Linear(num_hidden, 1, w_init='sigmoid')
 
         self.postconvnet = PostConvNet(num_hidden)
@@ -83,14 +82,14 @@ class MelDecoder(nn.Module):
 
         # Get decoder mask with triangular matrix
         if self.training:
-            m_mask = pos.ne(0).type(t.float)
+            m_mask = pos.ne(0).type(torch.float)
             mask = m_mask.eq(0).unsqueeze(1).repeat(1, decoder_len, 1)
-            mask = mask + t.triu(t.ones(decoder_len, decoder_len).cuda(), diagonal=1).repeat(batch_size, 1, 1).byte()
+            mask = mask + torch.triu(torch.ones(decoder_len, decoder_len).cuda(), diagonal=1).repeat(batch_size, 1, 1).byte()
             mask = mask.gt(0)
             zero_mask = c_mask.eq(0).unsqueeze(-1).repeat(1, 1, decoder_len)
             zero_mask = zero_mask.transpose(1, 2)
         else:
-            mask = t.triu(t.ones(decoder_len, decoder_len).cuda(), diagonal=1).repeat(batch_size, 1, 1).byte()
+            mask = torch.triu(torch.ones(decoder_len, decoder_len).cuda(), diagonal=1).repeat(batch_size, 1, 1).byte()
             mask = mask.gt(0)
             m_mask, zero_mask = None, None
 
@@ -139,8 +138,8 @@ class Model(nn.Module):
     """
     def __init__(self):
         super(Model, self).__init__()
-        self.encoder = Encoder(hp.embedding_size, hp.hidden_size)
-        self.decoder = MelDecoder(hp.hidden_size)
+        self.encoder = Encoder(config.embedding_size, config.hidden_size)
+        self.decoder = MelDecoder(config.hidden_size)
 
     def forward(self, characters, mel_input, pos_text, pos_mel):
         memory, c_mask, attns_enc = self.encoder.forward(characters, pos=pos_text)
@@ -157,9 +156,9 @@ class ModelPostNet(nn.Module):
 
     def __init__(self):
         super(ModelPostNet, self).__init__()
-        self.pre_projection = Conv(hp.n_mels, hp.hidden_size)
-        self.cbhg = CBHG(hp.hidden_size)
-        self.post_projection = Conv(hp.hidden_size, (hp.n_fft // 2) + 1)
+        self.pre_projection = Conv(config.n_mel, config.hidden_size)
+        self.cbhg = CBHG(config.hidden_size)
+        self.post_projection = Conv(config.hidden_size, (config.n_fft // 2) + 1)
 
     def forward(self, mel):
         mel = mel.transpose(1, 2)

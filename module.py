@@ -3,10 +3,10 @@ import math
 from collections import OrderedDict
 
 import numpy as np
-import torch as t
+import torch
 import torch.nn as nn
 
-import hyperparams as hp
+import config
 from text.symbols import symbols
 
 
@@ -126,9 +126,9 @@ class EncoderPrenet(nn.Module):
     def forward(self, x):
         x = self.embed(x)
         x = x.transpose(1, 2)
-        x = self.dropout1(self.batch_norm1(t.relu(self.conv1(x))))
-        x = self.dropout2(self.batch_norm2(t.relu(self.conv2(x))))
-        x = self.dropout3(self.batch_norm3(t.relu(self.conv3(x))))
+        x = self.dropout1(self.batch_norm1(torch.relu(self.conv1(x))))
+        x = self.dropout2(self.batch_norm2(torch.relu(self.conv2(x))))
+        x = self.dropout3(self.batch_norm3(torch.relu(self.conv3(x))))
         x = x.transpose(1, 2)
         x = self.projection(x)
 
@@ -139,7 +139,7 @@ class FFN(nn.Module):
     """
     Position-wise Feed-Forward Network.
     """
-    
+
     def __init__(self, num_hidden):
         """
         :param num_hidden: dimension of hidden 
@@ -154,7 +154,7 @@ class FFN(nn.Module):
     def forward(self, x):
         # FFN Network
         x_ = x.transpose(1, 2)
-        x_ = self.w_2(t.relu(self.w_1(x_)))
+        x_ = self.w_2(torch.relu(self.w_1(x_)))
         x_ = x_.transpose(1, 2)
 
         # Residual connection
@@ -178,7 +178,7 @@ class PostConvNet(nn.Module):
 
         super(PostConvNet, self).__init__()
         self.conv1 = Conv(
-            in_channels=hp.num_mels * hp.outputs_per_step,
+            in_channels=config.n_mel * config.outputs_per_step,
             out_channels=num_hidden,
             kernel_size=5,
             padding=4,
@@ -192,7 +192,7 @@ class PostConvNet(nn.Module):
 
         self.conv2 = Conv(
             in_channels=num_hidden,
-            out_channels=hp.num_mels * hp.outputs_per_step,
+            out_channels=config.n_mel * config.outputs_per_step,
             kernel_size=5,
             padding=4
         )
@@ -205,9 +205,9 @@ class PostConvNet(nn.Module):
 
     def forward(self, x, mask=None):
         # Causal Convolution (for auto-regressive)
-        x = self.dropout1(t.tanh(self.pre_batchnorm(self.conv1(x)[:, :, :-4])))
+        x = self.dropout1(torch.tanh(self.pre_batchnorm(self.conv1(x)[:, :, :-4])))
         for batch_norm, conv, dropout in zip(self.batch_norm_list, self.conv_list, self.dropout_list):
-            x = dropout(t.tanh(batch_norm(conv(x)[:, :, :-4])))
+            x = dropout(torch.tanh(batch_norm(conv(x)[:, :, :-4])))
         x = self.conv2(x)[:, :, :-4]
         return x
 
@@ -229,15 +229,15 @@ class MultiheadAttention(nn.Module):
 
     def forward(self, key, value, query, mask=None, query_mask=None):
         # Get attention score
-        attn = t.bmm(query, key.transpose(1, 2))
+        attn = torch.bmm(query, key.transpose(1, 2))
         attn = attn / math.sqrt(self.num_hidden_k)
 
         # Masking to ignore padding (key side)
         if mask is not None:
             attn = attn.masked_fill(mask, -2 ** 32 + 1)
-            attn = t.softmax(attn, dim=-1)
+            attn = torch.softmax(attn, dim=-1)
         else:
-            attn = t.softmax(attn, dim=-1)
+            attn = torch.softmax(attn, dim=-1)
 
         # Masking to ignore padding (query side)
         if query_mask is not None:
@@ -245,9 +245,9 @@ class MultiheadAttention(nn.Module):
 
         # Dropout
         attn = self.attn_dropout(attn)
-        
+
         # Get Context Vector
-        result = t.bmm(attn, value)
+        result = torch.bmm(attn, value)
 
         return result, attn
 
@@ -285,7 +285,7 @@ class Attention(nn.Module):
         batch_size = memory.size(0)
         seq_k = memory.size(1)
         seq_q = decoder_input.size(1)
-        
+
         # Repeat masks h times
         if query_mask is not None:
             query_mask = query_mask.unsqueeze(-1).repeat(1, 1, seq_k)
@@ -308,10 +308,10 @@ class Attention(nn.Module):
         # Concatenate all multihead context vector
         result = result.view(self.h, batch_size, seq_q, self.num_hidden_per_attn)
         result = result.permute(1, 2, 0, 3).contiguous().view(batch_size, seq_q, -1)
-        
+
         # Concatenate context vector with input (most important)
-        result = t.cat([decoder_input, result], dim=-1)
-        
+        result = torch.cat([decoder_input, result], dim=-1)
+
         # Final linear
         result = self.final_linear(result)
 
@@ -323,7 +323,7 @@ class Attention(nn.Module):
         result = self.layer_norm_1(result)
 
         return result, attns
-    
+
 
 class Prenet(nn.Module):
     """
@@ -341,12 +341,12 @@ class Prenet(nn.Module):
         self.output_size = output_size
         self.hidden_size = hidden_size
         self.layer = nn.Sequential(OrderedDict([
-             ('fc1', Linear(self.input_size, self.hidden_size)),
-             ('relu1', nn.ReLU()),
-             ('dropout1', nn.Dropout(p)),
-             ('fc2', Linear(self.hidden_size, self.output_size)),
-             ('relu2', nn.ReLU()),
-             ('dropout2', nn.Dropout(p)),
+            ('fc1', Linear(self.input_size, self.hidden_size)),
+            ('relu1', nn.ReLU()),
+            ('dropout1', nn.Dropout(p)),
+            ('fc2', Linear(self.hidden_size, self.output_size)),
+            ('relu2', nn.ReLU()),
+            ('dropout2', nn.Dropout(p)),
         ]))
 
     def forward(self, x):
@@ -401,7 +401,7 @@ class CBHG(nn.Module):
             self.batchnorm_list.append(nn.BatchNorm1d(hidden_size))
 
         convbank_outdim = hidden_size * K
-        
+
         self.conv_projection_1 = nn.Conv1d(
             in_channels=convbank_outdim,
             out_channels=hidden_size,
@@ -435,29 +435,27 @@ class CBHG(nn.Module):
 
     def forward(self, x):
         x = x.contiguous()
-        batch_size = x.size(0)
-        total_length = x.size(-1)
 
         convbank_list = list()
         convbank_input = x
 
         # Convolution bank filters
         for k, (conv, batchnorm) in enumerate(zip(self.convbank_list, self.batchnorm_list)):
-            convbank_input = t.relu(batchnorm(self._conv_fit_dim(conv(convbank_input), k+1).contiguous()))
+            convbank_input = torch.relu(batchnorm(self._conv_fit_dim(conv(convbank_input), k + 1).contiguous()))
             convbank_list.append(convbank_input)
 
         # Concatenate all features
-        conv_cat = t.cat(convbank_list, dim=1)
+        conv_cat = torch.cat(convbank_list, dim=1)
 
         # Max pooling
-        conv_cat = self.max_pool(conv_cat)[:,:,:-1]
+        conv_cat = self.max_pool(conv_cat)[:, :, :-1]
 
         # Projection
-        conv_projection = t.relu(self.batchnorm_proj_1(self._conv_fit_dim(self.conv_projection_1(conv_cat))))
+        conv_projection = torch.relu(self.batchnorm_proj_1(self._conv_fit_dim(self.conv_projection_1(conv_cat))))
         conv_projection = self.batchnorm_proj_2(self._conv_fit_dim(self.conv_projection_2(conv_projection))) + x
 
         # Highway networks
-        highway = self.highway.forward(conv_projection.transpose(1,2))
+        highway = self.highway.forward(conv_projection.transpose(1, 2))
 
         # Bidirectional GRU
         self.gru.flatten_parameters()
@@ -490,8 +488,8 @@ class Highwaynet(nn.Module):
     def forward(self, x):
         # Highway gated function
         for fc1, fc2 in zip(self.linears, self.gates):
-            h = t.relu(fc1.forward(x))
-            transform = t.sigmoid(fc2.forward(x))
+            h = torch.relu(fc1.forward(x))
+            transform = torch.sigmoid(fc2.forward(x))
             carry = 1. - transform
             x = h * transform + x * carry
 

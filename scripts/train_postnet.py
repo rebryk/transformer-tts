@@ -5,9 +5,9 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from data import PostDataset
-from data import collate_fn_postnet
 from network import *
 from utils import adjust_learning_rate
+from utils import collate_fn_postnet
 
 if __name__ == '__main__':
     dataset = PostDataset(

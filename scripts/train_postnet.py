@@ -1,3 +1,4 @@
+import argparse
 import os
 
 from tensorboardX import SummaryWriter
@@ -9,7 +10,17 @@ from network import *
 from utils import adjust_learning_rate
 from utils import collate_fn_postnet
 
+
+def get_config():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--log_path', type=str, help='Path to logs', default='logs/postnet')
+    parser.add_argument('--checkpoint_path', type=str, help='Path to checkpoint', default='checkpoint')
+    return parser.parse_args()
+
+
 if __name__ == '__main__':
+    args = get_config()
+
     dataset = PostDataset(
         csv_file=os.path.join(config.data_path, 'train.csv'),
         root_dir=os.path.join(config.data_path, 'wavs'),
@@ -28,7 +39,7 @@ if __name__ == '__main__':
     model.train()
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
 
-    writer = SummaryWriter(log_dir='logs/postnet')
+    writer = SummaryWriter(log_dir=args.log_path)
     global_step = 0
 
     for epoch in range(config.epochs):
@@ -76,13 +87,13 @@ if __name__ == '__main__':
             optimizer.step()
 
             if global_step % config.save_step == 0:
-                if not os.path.exists(config.checkpoint_path):
-                    os.makedirs(config.checkpoint_path)
+                if not os.path.exists(args.checkpoint_path):
+                    os.makedirs(args.checkpoint_path)
 
                 torch.save(
                     {
                         'model': model.state_dict(),
                         'optimizer': optimizer.state_dict()
                     },
-                    os.path.join(config.checkpoint_path, f'checkpoint_postnet_{global_step}.pth.tar')
+                    os.path.join(args.checkpoint_path, f'checkpoint_postnet_{global_step}.pth.tar')
                 )

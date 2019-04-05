@@ -22,10 +22,7 @@ epochs = 1_000_000
 lr = 0.001
 save_step = 2000
 image_step = 500
-batch_size = 32
 
 cleaners = 'english_cleaners'
 data_path = '/data/LJSpeech'
 sample_path = 'samples'
-
-device_ids = [0]

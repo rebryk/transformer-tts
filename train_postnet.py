@@ -15,6 +15,9 @@ def get_config():
     parser = argparse.ArgumentParser()
     parser.add_argument('--log_path', type=str, help='Path to logs', default='logs/postnet')
     parser.add_argument('--checkpoint_path', type=str, help='Path to checkpoint', default='checkpoint')
+    parser.add_argument('--batch_size', type=int, help='Batch size', default=64)
+    parser.add_argument('--n_gpu', type=int, help='Number of GPUs', default=1)
+    parser.add_argument('--n_worker', type=int, help='Number of workers', default=16)
     return parser.parse_args()
 
 
@@ -34,7 +37,7 @@ if __name__ == '__main__':
         ref_db=config.ref_db
     )
 
-    model = nn.DataParallel(ModelPostNet().cuda(), device_ids=config.device_ids)
+    model = nn.DataParallel(Model().cuda(), device_ids=list(range(args.n_gpu)))
 
     model.train()
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
@@ -45,11 +48,11 @@ if __name__ == '__main__':
     for epoch in range(config.epochs):
         dataloader = DataLoader(
             dataset=dataset,
-            batch_size=config.batch_size,
+            batch_size=args.batch_size,
             shuffle=True,
             collate_fn=collate_fn_postnet,
             drop_last=True,
-            num_workers=8
+            num_workers=args.n_worker
         )
 
         progress_bar = tqdm(dataloader)

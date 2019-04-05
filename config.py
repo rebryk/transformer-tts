@@ -28,4 +28,4 @@ cleaners = 'english_cleaners'
 data_path = '/data/LJSpeech'
 sample_path = 'samples'
 
-device_ids = None
+device_ids = [0]

@@ -6,4 +6,6 @@ Unidecode==0.4.21
 pandas
 numpy
 tensorboardX
+tensorboard
+tensorflow
 tqdm

@@ -121,6 +121,9 @@ if __name__ == '__main__':
             optimizer.step()
 
             if global_step % config.save_step == 0:
+                if not os.path.exists(config.checkpoint_path):
+                    os.makedirs(config.checkpoint_path)
+
                 torch.save(
                     {
                         'model': model.state_dict(),

@@ -32,11 +32,11 @@ def load_checkpoint(step, model_name='transformer'):
 
 
 def synthesis(text, args):
-    m = Model()
-    m_post = ModelPostNet()
+    model = Model()
+    model_post = ModelPostNet()
 
-    m.load_state_dict(load_checkpoint(args.restore_step1, 'transformer'))
-    m_post.load_state_dict(load_checkpoint(args.restore_step2, 'postnet'))
+    model.load_state_dict(load_checkpoint(args.restore_step1, 'transformer'))
+    model_post.load_state_dict(load_checkpoint(args.restore_step2, 'postnet'))
 
     text = np.asarray(text_to_sequence(text, [config.cleaners]))
     text = torch.LongTensor(text).unsqueeze(0)
@@ -45,19 +45,19 @@ def synthesis(text, args):
     pos_text = torch.arange(1, text.size(1) + 1).unsqueeze(0)
     pos_text = pos_text.cuda()
 
-    m = m.cuda()
-    m_post = m_post.cuda()
-    m.train(False)
-    m_post.train(False)
+    model = model.cuda()
+    model_post = model_post.cuda()
+    model.train(False)
+    model_post.train(False)
 
-    pbar = tqdm(range(args.max_len))
+    progress_bar = tqdm(range(args.max_len))
     with torch.no_grad():
-        for i in pbar:
+        for _ in progress_bar:
             pos_mel = torch.arange(1, mel_input.size(1) + 1).unsqueeze(0).cuda()
-            mel_pred, postnet_pred, attn, stop_token, _, attn_dec = m.forward(text, mel_input, pos_text, pos_mel)
+            mel_pred, postnet_pred, attn, stop_token, _, attn_dec = model.forward(text, mel_input, pos_text, pos_mel)
             mel_input = torch.cat([mel_input, postnet_pred[:, -1:, :]], dim=1)
 
-        mag_pred = m_post.forward(postnet_pred)
+        mag_pred = model_post.forward(postnet_pred)
 
     wav = spectrogram2wav(
         mag=mag_pred.squeeze(0).cpu().numpy(),

@@ -136,6 +136,7 @@ class Model(nn.Module):
     """
     Transformer Network
     """
+
     def __init__(self):
         super(Model, self).__init__()
         self.encoder = Encoder(config.embedding_size, config.hidden_size)
@@ -143,8 +144,12 @@ class Model(nn.Module):
 
     def forward(self, characters, mel_input, pos_text, pos_mel):
         memory, c_mask, attns_enc = self.encoder.forward(characters, pos=pos_text)
-        mel_output, postnet_output, attn_probs, stop_preds, attns_dec = self.decoder.forward(memory, mel_input, c_mask,
-                                                                                             pos=pos_mel)
+        mel_output, postnet_output, attn_probs, stop_preds, attns_dec = self.decoder.forward(
+            memory=memory,
+            decoder_input=mel_input,
+            c_mask=c_mask,
+            pos=pos_mel
+        )
 
         return mel_output, postnet_output, attn_probs, stop_preds, attns_enc, attns_dec
 
